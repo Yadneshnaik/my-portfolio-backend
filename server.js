@@ -6,37 +6,60 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const app = express();
+
+// Basic CORS (no open origin *)
 app.use(cors());
 app.use(express.json());
 
-app.post("/api/send-mail", async (req, res) => {
+app.post("/api/contact", async (req, res) => {
   const { name, email, message } = req.body;
+
+  if (!name || !email || !message) {
+    return res.status(400).json({
+      success: false,
+      error: "All fields (name, email, message) are required",
+    });
+  }
 
   try {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER,  
-        pass: process.env.EMAIL_PASS,  
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS, // MUST be Gmail App Password
       },
     });
 
-    await transporter.sendMail({
-      from: email,
+    const mailOptions = {
+      from: `"${name}" <${email}>`,
       to: process.env.EMAIL_USER,
       subject: `New Contact Message from ${name}`,
-      text: message,
-      html: `<h3>New Message</h3>
-             <p><strong>Name:</strong> ${name}</p>
-             <p><strong>Email:</strong> ${email}</p>
-             <p><strong>Message:</strong> ${message}</p>`,
-    });
+      html: `
+        <h3>New Contact Message</h3>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Message:</strong><br>${message}</p>
+      `,
+    };
 
-    res.json({ success: true });
+    await transporter.sendMail(mailOptions);
+
+    res.json({
+      success: true,
+      message: "Mail sent successfully!",
+    });
   } catch (error) {
-    console.log(error);
-    res.json({ success: false });
+    console.error("MAIL ERROR:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message, // Lets Postman show real issue
+    });
   }
 });
 
-app.listen(5000, () => console.log("Server running on port 5000"));
+app.get("/", (req, res) => {
+  res.send("Mail API is running...");
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
